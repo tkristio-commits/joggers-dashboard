@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Keuangan Komunitas Joggers 2026</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+  :root {
+    --bg: #0f172a; --card: #1e293b; --card2: #16213a;
+    --accent: #22c55e; --accent2: #f59e0b; --danger: #ef4444;
+    --text: #e2e8f0; --muted: #94a3b8; --border: #334155;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px;
+    background: linear-gradient(160deg, #0f172a 0%, #1e1b4b 100%);
+    color: var(--text); font-family: 'Segoe UI', Roboto, Arial, sans-serif;
+  }
+  h1 { font-size: 1.6rem; margin: 0 0 4px 0; }
+  h2 { font-size: 1.1rem; margin: 0 0 14px 0; border-left: 4px solid var(--accent); padding-left: 10px;}
+  .subtitle { color: var(--muted); margin: 0 0 10px 0; font-size: 0.9rem;}
+  .status-row { display:flex; align-items:center; gap:10px; margin-bottom:22px; flex-wrap:wrap; }
+  .status-pill { font-size:0.78rem; padding:4px 12px; border-radius:20px; background:rgba(255,255,255,0.06); color:var(--muted);}
+  .status-pill.live { color:var(--accent); background:rgba(34,197,94,0.12); }
+  .status-pill.err { color:var(--danger); background:rgba(239,68,68,0.12); }
+  #refreshBtn { cursor:pointer; border:1px solid var(--border); background:var(--card); color:var(--text);
+    padding:5px 14px; border-radius:20px; font-size:0.78rem; }
+  #refreshBtn:hover { background:var(--card2); }
+  .grid-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 28px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 18px; box-shadow: 0 4px 14px rgba(0,0,0,0.25); }
+  .card .label { color: var(--muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: .5px;}
+  .card .value { font-size: 1.6rem; font-weight: 700; margin-top: 6px; }
+  .card.green .value { color: var(--accent); }
+  .card.amber .value { color: var(--accent2); }
+  .card.red .value { color: var(--danger); }
+  .section { background: var(--card2); border: 1px solid var(--border); border-radius: 16px; padding: 20px; margin-bottom: 24px; }
+  .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px;}
+  @media (max-width: 900px) { .charts-row { grid-template-columns: 1fr; } }
+  .chart-box { background: var(--card2); border: 1px solid var(--border); border-radius: 16px; padding: 20px; height: 340px; position: relative;}
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; position: sticky; top:0; background: var(--card2); }
+  tr:hover { background: rgba(255,255,255,0.03); }
+  .badge { padding: 2px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
+  .badge.lunas { background: rgba(34,197,94,0.15); color: var(--accent); }
+  .badge.belum { background: rgba(239,68,68,0.15); color: var(--danger); }
+  .table-wrap { max-height: 480px; overflow-y: auto; }
+  .month-grid { display:flex; gap: 3px; }
+  .dot { width: 14px; height: 14px; border-radius: 3px; }
+  .dot.v { background: var(--accent); }
+  .dot.x { background: #3f4a63; }
+  .search-box { margin-bottom: 12px; }
+  .search-box input { width: 100%; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border);
+    background: #0f172a; color: var(--text); font-size: 0.9rem; }
+  footer { color: var(--muted); font-size: 0.78rem; text-align: center; margin-top: 30px; }
+  #errorBanner { display:none; background: rgba(239,68,68,0.12); border:1px solid var(--danger); color:#fca5a5;
+    padding: 14px 18px; border-radius: 12px; margin-bottom: 20px; font-size: 0.88rem; }
+  .skeleton { color: var(--muted); font-size: 0.85rem; padding: 20px; text-align:center; }
+</style>
+</head>
+<body>
+  <h1>🏃 Dashboard Keuangan Komunitas Joggers 2026</h1>
+  <p class="subtitle">Live dari Google Sheet "LAPORAN KEUANGAN JOGGERS 2026" (tab: Laporan Keuangan Joggers 2026)</p>
+  <div class="status-row">
+    <span class="status-pill" id="statusPill">Memuat data...</span>
+    <button id="refreshBtn" onclick="loadData()">🔄 Refresh sekarang</button>
+  </div>
+
+  <div id="errorBanner"></div>
+  <div id="content" style="display:none;">
+
+  <div class="grid-cards">
+    <div class="card"><div class="label">Jumlah Anggota</div><div class="value" id="k-total">-</div></div>
+    <div class="card green"><div class="label">Lunas 12 Bulan</div><div class="value" id="k-lunas">-</div></div>
+    <div class="card red"><div class="label">Belum Bayar</div><div class="value" id="k-belum">-</div></div>
+    <div class="card amber"><div class="label">Total Iuran Terkumpul</div><div class="value" id="k-iuran">-</div></div>
+    <div class="card"><div class="label">Saldo Kas Akhir</div><div class="value" id="k-saldo">-</div></div>
+  </div>
+
+  <div class="charts-row">
+    <div class="chart-box"><canvas id="chartStatus"></canvas></div>
+    <div class="chart-box"><canvas id="chartCash"></canvas></div>
+  </div>
+
+  <div class="section">
+    <h2>Buku Kas Umum</h2>
+    <table>
+      <thead><tr><th>No</th><th>Tanggal</th><th>Uraian</th><th>Debit</th><th>Kredit</th><th>Saldo</th></tr></thead>
+      <tbody id="kas-table"></tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Daftar Iuran Anggota (Jan - Des)</h2>
+    <div class="search-box"><input type="text" id="searchInput" placeholder="Cari nama anggota..."></div>
+    <div class="table-wrap">
+    <table>
+      <thead><tr><th>No</th><th>Nama</th><th>Tgl Lahir</th><th>Bulan Lunas</th><th>Status Bulanan</th><th>Total Iuran</th><th>Status</th></tr></thead>
+      <tbody id="member-table"></tbody>
+    </table>
+    </div>
+  </div>
+
+  </div>
+  <div class="skeleton" id="skeleton">Mengambil data terbaru dari spreadsheet...</div>
+
+  <footer id="footerNote">Dashboard mengambil data langsung dari Google Sheet setiap kali halaman dimuat / direfresh · Komunitas Joggers 2026</footer>
+
+<script>
+const SHEET_ID = "1aWkG9UTIhhz4ekdtBG2MuBoRzoU1JiWRVfUHZnlONPg";
+const GID_MAIN = "1250800974";
+const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${GID_MAIN}&_=${Date.now()}`;
+
+function fmtRp(n) { return "Rp " + Math.round(n).toLocaleString("id-ID"); }
+function parseRp(s) {
+  if (!s) return 0;
+  const n = parseInt(String(s).replace(/[^0-9-]/g, ""), 10);
+  return isNaN(n) ? 0 : n;
+}
+
+// Minimal RFC4180 CSV parser (handles quoted fields with commas/escaped quotes)
+function parseCSV(text) {
+  const rows = [];
+  let row = [], field = "", inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (text[i+1] === '"') { field += '"'; i++; }
+        else { inQuotes = false; }
+      } else { field += c; }
+    } else {
+      if (c === '"') inQuotes = true;
+      else if (c === ',') { row.push(field); field = ""; }
+      else if (c === '\r') { /* skip */ }
+      else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ""; }
+      else field += c;
+    }
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+
+function parseSheet(rows) {
+  // Iuran per bulan
+  let iuranPerBulan = 25000;
+  for (let i = 0; i < rows.length; i++) {
+    if (rows[i][1] === "Iuran per bulan (Rp)" && rows[i+1]) {
+      iuranPerBulan = parseRp(rows[i+1][1]);
+      break;
+    }
+  }
+
+  // Member table: header row has "No" and "Nama Anggota"
+  let headerIdx = rows.findIndex(r => r[0] === "No" && r[1] === "Nama Anggota");
+  const members = [];
+  if (headerIdx >= 0) {
+    for (let i = headerIdx + 1; i < rows.length; i++) {
+      const r = rows[i];
+      if (!/^\d+$/.test(r[0])) break;
+      members.push({
+        no: parseInt(r[0]),
+        nama: r[1],
+        tgl_lahir: r[2],
+        months: r.slice(3, 15),
+        bulan_lunas: parseInt(r[15]) || 0,
+        total: r[16],
+        status: r[17]
+      });
+    }
+  }
+
+  // Kas book
+  let kasIdx = rows.findIndex(r => r[0] && String(r[0]).indexOf("BUKU KAS UMUM") === 0);
+  const kas = [];
+  if (kasIdx >= 0) {
+    let kHeaderIdx = -1;
+    for (let i = kasIdx; i < rows.length; i++) {
+      if (rows[i][0] === "No" && rows[i][1] === "Tanggal") { kHeaderIdx = i; break; }
+    }
+    if (kHeaderIdx >= 0) {
+      for (let i = kHeaderIdx + 1; i < rows.length; i++) {
+        const r = rows[i];
+        if (!/^\d+$/.test(r[0])) break;
+        kas.push({
+          no: parseInt(r[0]), tanggal: r[1], uraian: r[2],
+          debit: parseRp(r[8]), kredit: parseRp(r[10]), saldo: parseRp(r[12])
+        });
+      }
+    }
+  }
+
+  return { iuranPerBulan, members, kas };
+}
+
+let charts = {};
+function destroyCharts() { Object.values(charts).forEach(c => c && c.destroy()); charts = {}; }
+
+function render(parsed) {
+  const { members, kas } = parsed;
+  const total = members.length;
+  const lunasCount = members.filter(m => m.status === "Lunas").length;
+  const belumCount = total - lunasCount;
+  const totalIuran = members.reduce((s, m) => s + parseRp(m.total), 0);
+  const lastSaldo = kas.length ? kas[kas.length - 1].saldo : 0;
+
+  document.getElementById("k-total").innerText = total;
+  document.getElementById("k-lunas").innerText = lunasCount;
+  document.getElementById("k-belum").innerText = belumCount;
+  document.getElementById("k-iuran").innerText = fmtRp(totalIuran);
+  document.getElementById("k-saldo").innerText = fmtRp(lastSaldo);
+
+  destroyCharts();
+
+  charts.status = new Chart(document.getElementById("chartStatus"), {
+    type: "doughnut",
+    data: { labels: ["Lunas (12 bulan)", "Belum Bayar"], datasets: [{ data: [lunasCount, belumCount], backgroundColor: ["#22c55e", "#ef4444"], borderWidth: 0 }] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: "#e2e8f0" } },
+        title: { display: true, text: "Status Pembayaran Iuran Anggota", color: "#e2e8f0", font: { size: 14 } } } }
+  });
+
+  charts.cash = new Chart(document.getElementById("chartCash"), {
+    type: "bar",
+    data: { labels: kas.map(k => k.uraian.length > 22 ? k.uraian.slice(0, 22) + "…" : k.uraian),
+      datasets: [
+        { label: "Debit (masuk)", data: kas.map(k => k.debit), backgroundColor: "#22c55e" },
+        { label: "Kredit (keluar)", data: kas.map(k => k.kredit), backgroundColor: "#ef4444" }
+      ] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: "#e2e8f0" } },
+        title: { display: true, text: "Arus Kas Umum", color: "#e2e8f0", font: { size: 14 } } },
+      scales: {
+        x: { ticks: { color: "#94a3b8", maxRotation: 30, minRotation: 0 }, grid: { color: "#334155" } },
+        y: { ticks: { color: "#94a3b8", callback: v => (v / 1e6) + "jt" }, grid: { color: "#334155" } }
+      } }
+  });
+
+  const kasBody = document.getElementById("kas-table");
+  kasBody.innerHTML = "";
+  kas.forEach(k => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${k.no}</td><td>${k.tanggal}</td><td>${k.uraian}</td>
+      <td style="color:${k.debit ? '#22c55e' : '#475569'}">${k.debit ? fmtRp(k.debit) : '-'}</td>
+      <td style="color:${k.kredit ? '#ef4444' : '#475569'}">${k.kredit ? fmtRp(k.kredit) : '-'}</td>
+      <td><b>${fmtRp(k.saldo)}</b></td>`;
+    kasBody.appendChild(tr);
+  });
+  const totalRow = document.createElement("tr");
+  totalRow.style.borderTop = "2px solid #475569";
+  totalRow.innerHTML = `<td colspan="3"><b>SALDO KAS</b></td>
+    <td><b>${fmtRp(kas.reduce((s, k) => s + k.debit, 0))}</b></td>
+    <td><b>${fmtRp(kas.reduce((s, k) => s + k.kredit, 0))}</b></td>
+    <td><b>${fmtRp(lastSaldo)}</b></td>`;
+  kasBody.appendChild(totalRow);
+
+  const monthLabels = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+  function renderMembers(filter) {
+    const body = document.getElementById("member-table");
+    body.innerHTML = "";
+    members
+      .filter(m => !filter || m.nama.toLowerCase().includes(filter.toLowerCase()))
+      .forEach(m => {
+        const dots = m.months.map((v, i) => `<span class="dot ${v === 'v' ? 'v' : 'x'}" title="${monthLabels[i]}"></span>`).join("");
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td>${m.no}</td><td>${m.nama}</td><td>${m.tgl_lahir}</td>
+          <td>${m.bulan_lunas}/12</td>
+          <td><div class="month-grid">${dots}</div></td>
+          <td>${m.total}</td>
+          <td><span class="badge ${m.status === 'Lunas' ? 'lunas' : 'belum'}">${m.status}</span></td>`;
+        body.appendChild(tr);
+      });
+  }
+  renderMembers("");
+  document.getElementById("searchInput").oninput = e => renderMembers(e.target.value);
+}
+
+async function loadData() {
+  const pill = document.getElementById("statusPill");
+  const banner = document.getElementById("errorBanner");
+  pill.textContent = "Memuat data...";
+  pill.className = "status-pill";
+  banner.style.display = "none";
+  try {
+    const r = await fetch(CSV_URL, { cache: "no-store" });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const text = await r.text();
+    const rows = parseCSV(text);
+    const parsed = parseSheet(rows);
+    if (!parsed.members.length) throw new Error("Tidak ada data anggota terbaca dari sheet");
+    render(parsed);
+    document.getElementById("skeleton").style.display = "none";
+    document.getElementById("content").style.display = "block";
+    const now = new Date();
+    pill.textContent = "🟢 Live — diperbarui " + now.toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" });
+    pill.className = "status-pill live";
+  } catch (e) {
+    pill.textContent = "Gagal memuat";
+    pill.className = "status-pill err";
+    banner.style.display = "block";
+    banner.innerHTML = "⚠️ Tidak bisa mengambil data terbaru dari Google Sheet (" + e.message +
+      "). Pastikan koneksi internet aktif dan sheet masih dapat diakses publik, lalu klik Refresh.";
+    if (!document.getElementById("content").style.display || document.getElementById("content").style.display === "none") {
+      document.getElementById("skeleton").textContent = "Gagal memuat data. Klik tombol Refresh di atas.";
+    }
+  }
+}
+
+loadData();
+setInterval(loadData, 5 * 60 * 1000); // auto-refresh every 5 minutes
+</script>
+</body>
+</html>
