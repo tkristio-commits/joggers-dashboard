@@ -45,7 +45,26 @@
   .badge { padding: 2px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
   .badge.lunas { background: rgba(34,197,94,0.15); color: var(--accent); }
   .badge.belum { background: rgba(239,68,68,0.15); color: var(--danger); }
-  .table-wrap { max-height: 480px; overflow-y: auto; }
+  .table-wrap { max-height: 480px; overflow: auto; }
+  .table-wrap table { min-width: 680px; }
+  .table-wrap table th:nth-child(1), .table-wrap table td:nth-child(1),
+  .table-wrap table th:nth-child(2), .table-wrap table td:nth-child(2) {
+    position: sticky; background: var(--card2);
+  }
+  .table-wrap table th:nth-child(1), .table-wrap table td:nth-child(1) { left: 0; min-width: 34px; z-index: 3; }
+  .table-wrap table th:nth-child(2), .table-wrap table td:nth-child(2) { left: 34px; min-width: 150px; z-index: 3; box-shadow: 3px 0 6px rgba(0,0,0,0.35); }
+  .table-wrap table thead th { z-index: 4; }
+  .kas-cards { display: grid; gap: 12px; }
+  .kas-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .kas-card.total { border-color: var(--accent); background: rgba(34,197,94,0.08); }
+  .kas-card-head { display: flex; justify-content: space-between; color: var(--muted); font-size: 0.78rem; margin-bottom: 6px; }
+  .kas-desc { font-weight: 600; margin-bottom: 10px; }
+  .kas-rows { display: flex; flex-direction: column; gap: 5px; font-size: 0.88rem; }
+  .kas-row { display: flex; justify-content: space-between; }
+  .kas-row span:first-child { color: var(--muted); }
+  .kas-row.total-row { border-top: 1px solid var(--border); margin-top: 4px; padding-top: 7px; font-weight: 700; }
+  .v-in { color: var(--accent); font-weight: 600; }
+  .v-out { color: var(--danger); font-weight: 600; }
   .month-grid { display:flex; gap: 3px; }
   .dot { width: 14px; height: 14px; border-radius: 3px; }
   .dot.v { background: var(--accent); }
@@ -80,15 +99,12 @@
 
   <div class="charts-row">
     <div class="chart-box"><canvas id="chartStatus"></canvas></div>
-    <div class="chart-box"><canvas id="chartCash"></canvas></div>
+    <div class="chart-box" style="height:380px;"><canvas id="chartCash"></canvas></div>
   </div>
 
   <div class="section">
     <h2>Buku Kas Umum</h2>
-    <table>
-      <thead><tr><th>No</th><th>Tanggal</th><th>Uraian</th><th>Debit</th><th>Kredit</th><th>Saldo</th></tr></thead>
-      <tbody id="kas-table"></tbody>
-    </table>
+    <div class="kas-cards" id="kas-cards"></div>
   </div>
 
   <div class="section">
@@ -223,37 +239,46 @@ function render(parsed) {
 
   charts.cash = new Chart(document.getElementById("chartCash"), {
     type: "bar",
-    data: { labels: kas.map(k => k.uraian.length > 22 ? k.uraian.slice(0, 22) + "…" : k.uraian),
+    data: { labels: kas.map(k => k.uraian.length > 30 ? k.uraian.slice(0, 30) + "…" : k.uraian),
       datasets: [
         { label: "Debit (masuk)", data: kas.map(k => k.debit), backgroundColor: "#22c55e" },
         { label: "Kredit (keluar)", data: kas.map(k => k.kredit), backgroundColor: "#ef4444" }
       ] },
     options: { responsive: true, maintainAspectRatio: false,
+      indexAxis: "y",
       plugins: { legend: { labels: { color: "#e2e8f0" } },
         title: { display: true, text: "Arus Kas Umum", color: "#e2e8f0", font: { size: 14 } } },
       scales: {
-        x: { ticks: { color: "#94a3b8", maxRotation: 30, minRotation: 0 }, grid: { color: "#334155" } },
-        y: { ticks: { color: "#94a3b8", callback: v => (v / 1e6) + "jt" }, grid: { color: "#334155" } }
+        x: { ticks: { color: "#94a3b8", callback: v => (v / 1e6) + "jt" }, grid: { color: "#334155" } },
+        y: { ticks: { color: "#94a3b8", font: { size: 10.5 } }, grid: { display: false } }
       } }
   });
 
-  const kasBody = document.getElementById("kas-table");
-  kasBody.innerHTML = "";
+  const kasCards = document.getElementById("kas-cards");
+  kasCards.innerHTML = "";
   kas.forEach(k => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${k.no}</td><td>${k.tanggal}</td><td>${k.uraian}</td>
-      <td style="color:${k.debit ? '#22c55e' : '#475569'}">${k.debit ? fmtRp(k.debit) : '-'}</td>
-      <td style="color:${k.kredit ? '#ef4444' : '#475569'}">${k.kredit ? fmtRp(k.kredit) : '-'}</td>
-      <td><b>${fmtRp(k.saldo)}</b></td>`;
-    kasBody.appendChild(tr);
+    const card = document.createElement("div");
+    card.className = "kas-card";
+    card.innerHTML = `
+      <div class="kas-card-head"><span>#${k.no}</span><span>${k.tanggal}</span></div>
+      <div class="kas-desc">${k.uraian}</div>
+      <div class="kas-rows">
+        <div class="kas-row"><span>Debit</span><span class="v-in">${k.debit ? fmtRp(k.debit) : '-'}</span></div>
+        <div class="kas-row"><span>Kredit</span><span class="v-out">${k.kredit ? fmtRp(k.kredit) : '-'}</span></div>
+        <div class="kas-row total-row"><span>Saldo</span><span>${fmtRp(k.saldo)}</span></div>
+      </div>`;
+    kasCards.appendChild(card);
   });
-  const totalRow = document.createElement("tr");
-  totalRow.style.borderTop = "2px solid #475569";
-  totalRow.innerHTML = `<td colspan="3"><b>SALDO KAS</b></td>
-    <td><b>${fmtRp(kas.reduce((s, k) => s + k.debit, 0))}</b></td>
-    <td><b>${fmtRp(kas.reduce((s, k) => s + k.kredit, 0))}</b></td>
-    <td><b>${fmtRp(lastSaldo)}</b></td>`;
-  kasBody.appendChild(totalRow);
+  const totalCard = document.createElement("div");
+  totalCard.className = "kas-card total";
+  totalCard.innerHTML = `
+    <div class="kas-card-head"><span><b>SALDO KAS</b></span><span></span></div>
+    <div class="kas-rows">
+      <div class="kas-row"><span>Total Debit</span><span class="v-in">${fmtRp(kas.reduce((s, k) => s + k.debit, 0))}</span></div>
+      <div class="kas-row"><span>Total Kredit</span><span class="v-out">${fmtRp(kas.reduce((s, k) => s + k.kredit, 0))}</span></div>
+      <div class="kas-row total-row"><span>Saldo Akhir</span><span>${fmtRp(lastSaldo)}</span></div>
+    </div>`;
+  kasCards.appendChild(totalCard);
 
   const monthLabels = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
   function renderMembers(filter) {
